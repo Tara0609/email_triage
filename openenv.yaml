@@ -1,0 +1,147 @@
+name: email-triage
+version: "1.0.0"
+description: >
+  An OpenEnv environment that simulates real-world corporate email triage.
+  Agents must classify urgency, extract action items, and perform full
+  multi-stakeholder triage across 3 difficulty levels.
+
+author: Email Triage Team
+license: MIT
+
+environment:
+  type: text
+  runtime: python
+  framework: fastapi
+
+observation_space:
+  type: object
+  properties:
+    task_id:
+      type: string
+      description: Identifier of the current task (task_1 / task_2 / task_3)
+    task_description:
+      type: string
+      description: Natural language description of what the agent must do
+    emails:
+      type: array
+      items:
+        type: object
+        properties:
+          id:         { type: string }
+          subject:    { type: string }
+          sender:     { type: string }
+          sender_email: { type: string }
+          body:       { type: string }
+          timestamp:  { type: string, format: date-time }
+          thread_id:  { type: string, nullable: true }
+          attachments: { type: array, items: { type: string } }
+    context:
+      type: object
+      description: Task metadata (action_type, difficulty, progress counters)
+    step_count:   { type: integer }
+    max_steps:    { type: integer }
+
+action_space:
+  type: object
+  description: >
+    Action schema depends on task action_type (found in observation.context.action_type):
+  variants:
+    classify_urgency:
+      properties:
+        email_id:  { type: string }
+        urgency:   { type: string, enum: [urgent, normal, low] }
+        reason:    { type: string, nullable: true }
+      required: [email_id, urgency]
+
+    extract_actions:
+      properties:
+        email_id:
+          type: string
+        action_items:
+          type: array
+          items:
+            properties:
+              description: { type: string }
+              assignee:    { type: string }
+              due_date:    { type: string, nullable: true }
+        summary:
+          type: string
+      required: [email_id, action_items, summary]
+
+    full_triage:
+      properties:
+        email_id:   { type: string }
+        urgency:    { type: string, enum: [urgent, normal, low] }
+        department: { type: string, enum: [engineering, sales, support, hr, finance, legal, management] }
+        reply_subject: { type: string }
+        action_items:
+          type: array
+          items:
+            properties:
+              description: { type: string }
+              assignee:    { type: string }
+              due_date:    { type: string, nullable: true }
+        requires_immediate_response: { type: boolean }
+        summary: { type: string }
+      required: [email_id, urgency, department, reply_subject, action_items, requires_immediate_response, summary]
+
+reward:
+  range: [0.0, 1.0]
+  description: >
+    Final score is computed by a task-specific grader on episode completion.
+    Intermediate steps return a small progress signal (0.0–0.05).
+  partial_credit: true
+
+tasks:
+  - id: task_1
+    name: Email Urgency Classification
+    difficulty: easy
+    num_emails: 6
+    action_type: classify_urgency
+    max_steps: 10
+    scoring: >
+      1 point per correct classification / 6 total.
+      Off-by-one-level gives 0.3 partial credit.
+
+  - id: task_2
+    name: Action Item Extraction
+    difficulty: medium
+    num_emails: 3
+    action_type: extract_actions
+    max_steps: 10
+    scoring: >
+      Per email: 0.4 pts assignee recall + 0.4 pts keyword coverage + 0.2 pts summary quality.
+      Averaged across 3 emails.
+
+  - id: task_3
+    name: Full Email Triage
+    difficulty: hard
+    num_emails: 3
+    action_type: full_triage
+    max_steps: 15
+    scoring: >
+      Per email: 0.25 urgency + 0.25 department + 0.20 action items + 0.15 reply subject + 0.15 immediate flag.
+      Averaged across 3 emails.
+
+endpoints:
+  reset:
+    method: POST
+    path: /reset
+    body: { task_id: string }
+  step:
+    method: POST
+    path: /step
+    body: { action: object }
+  state:
+    method: GET
+    path: /state
+  tasks:
+    method: GET
+    path: /tasks
+  health:
+    method: GET
+    path: /health
+
+docker:
+  port: 7860
+  cmd: ["python", "app.py"]
