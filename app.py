@@ -74,6 +74,24 @@ class StepRequest(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@app.get("/")
+def root():
+    """Space homepage — confirms the server is live."""
+    return {
+        "service": "email-triage-openenv",
+        "version": "2.0.0",
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health",
+        "tasks": "/tasks",
+        "usage": {
+            "reset": "POST /reset  body: {task_id: task_1|task_2|task_3|task_4}",
+            "step":  "POST /step   body: {session_id, action}",
+            "state": "GET  /state  query: ?session_id=...",
+        },
+    }
+
+
 @app.get("/health")
 def health():
     return {
