@@ -13,14 +13,18 @@ dependencies = [
     "fastapi==0.115.0",
     "uvicorn==0.30.6",
     "pydantic==2.9.2",
-    "openai==1.51.0",
+    "openai>=2.7.2",
     "requests==2.32.3",
     "python-multipart==0.0.12",
+    "openenv-core>=0.2.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "httpx"]
 
+[project.scripts]
+serve = "server.app:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["env*"]
+include = ["env*", "server*"]
