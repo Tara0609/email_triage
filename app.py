@@ -16,7 +16,7 @@ Endpoints:
 import uuid
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -121,7 +121,13 @@ def list_tasks():
 
 
 @app.post("/reset", response_model=ResetResponse)
-def reset(request: ResetRequest):
+def reset(body: Optional[ResetRequest] = Body(default=None)):
+    """
+    Start a new episode.
+    Body is fully optional — bare POST /reset uses task_1 by default.
+    Accepts: no body, empty {}, or {"task_id": "task_1", "session_id": null}
+    """
+    request = body if body is not None else ResetRequest()
     sid = request.session_id or str(uuid.uuid4())
     env = EmailTriageEnv()
     _sessions[sid] = env
@@ -130,6 +136,8 @@ def reset(request: ResetRequest):
         obs = env.reset(task_id=request.task_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
 
     from env.tasks import TASKS
     task = TASKS[request.task_id]
