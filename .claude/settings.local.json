@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \":*)",
+      "Bash(python validate.py)",
+      "Bash(kill %1)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :7860)",
+      "Bash(kill -9 772)",
+      "Bash(powershell -Command 'Stop-Process -Id 772 -Force' 2)",
+      "Bash(1 sleep:*)",
+      "Bash(ENV_URL=http://localhost:7862 python validate.py)",
+      "Bash(docker build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:tara0609-email-triage.hf.space)"
+    ]
+  }
+}
