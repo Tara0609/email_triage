@@ -105,10 +105,71 @@ def serve_openenv_yaml():
 @app.get("/health")
 def health():
     return {
-        "status": "ok",
+        "status": "healthy",
         "service": "email-triage-openenv",
         "version": "2.0.0",
         "active_sessions": len(_sessions),
+    }
+
+
+@app.get("/metadata")
+def metadata():
+    """OpenEnv metadata endpoint — returns name and description."""
+    return {
+        "name": "email-triage",
+        "description": (
+            "An OpenEnv-compliant environment for evaluating AI agents on "
+            "real-world corporate email triage tasks: urgency classification, "
+            "action-item extraction, full multi-stakeholder routing, and priority ranking."
+        ),
+        "version": "2.0.0",
+        "tasks": ["task_1", "task_2", "task_3", "task_4"],
+    }
+
+
+@app.get("/schema")
+def schema():
+    """OpenEnv schema endpoint — returns action, observation, and state schemas."""
+    return {
+        "action": {
+            "type": "object",
+            "description": "Action schema varies by task action_type",
+            "variants": ["classify_urgency", "extract_actions", "full_triage", "prioritize_emails"],
+        },
+        "observation": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string"},
+                "task_description": {"type": "string"},
+                "emails": {"type": "array"},
+                "context": {"type": "object"},
+                "step_count": {"type": "integer"},
+                "max_steps": {"type": "integer"},
+            },
+        },
+        "state": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string"},
+                "step_count": {"type": "integer"},
+                "done": {"type": "boolean"},
+                "cumulative_reward": {"type": "number"},
+            },
+        },
+    }
+
+
+@app.post("/mcp")
+def mcp(body: dict = Body(default={})):
+    """MCP/JSON-RPC endpoint for OpenEnv compatibility."""
+    return {
+        "jsonrpc": "2.0",
+        "id": body.get("id", 1),
+        "result": {
+            "name": "email-triage",
+            "version": "2.0.0",
+            "capabilities": ["reset", "step", "state", "metadata", "schema"],
+        },
     }
 
 
