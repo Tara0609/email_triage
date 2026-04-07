@@ -14,10 +14,12 @@ Endpoints:
 """
 
 import uuid
+import os
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -90,6 +92,14 @@ def root():
             "state": "GET  /state  query: ?session_id=...",
         },
     }
+
+
+@app.get("/openenv.yaml", response_class=PlainTextResponse)
+def serve_openenv_yaml():
+    """Serve the OpenEnv manifest so validators can fetch it via HTTP."""
+    yaml_path = os.path.join(os.path.dirname(__file__), "openenv.yaml")
+    with open(yaml_path, "r") as f:
+        return f.read()
 
 
 @app.get("/health")
