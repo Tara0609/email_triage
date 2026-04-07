@@ -1,8 +1,5 @@
 FROM python:3.11-slim
 
-# HF Spaces runs as non-root user 1000
-RUN useradd -m -u 1000 appuser
-
 WORKDIR /app
 
 COPY requirements.txt .
@@ -13,6 +10,5 @@ COPY . .
 # HF Spaces expects port 7860
 EXPOSE 7860
 
-USER appuser
-
-CMD ["python", "app.py"]
+# Run uvicorn directly — no custom user (HF manages UID 1000 internally)
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
