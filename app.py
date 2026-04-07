@@ -1,31 +1,36 @@
 """
 FastAPI server implementing the OpenEnv HTTP spec for Email Triage.
 
+Session-based: every /reset call returns a unique session_id.
+All subsequent /step and /state calls must include that session_id,
+allowing multiple agents to run concurrently without interference.
+
 Endpoints:
-  POST /reset          - start a new episode
-  POST /step           - submit an action
-  GET  /state          - inspect current episode state
-  GET  /tasks          - list available tasks
-  GET  /health         - health check
+  POST /reset   – start a new episode, returns session_id
+  POST /step    – submit one action for a session
+  GET  /state   – inspect current episode state  (?session_id=...)
+  GET  /tasks   – list available tasks
+  GET  /health  – health check
 """
 
-from fastapi import FastAPI, HTTPException
+import uuid
+from typing import Any, Dict, Optional
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Any, Dict, Optional
 import uvicorn
 
 from env import EmailTriageEnv
-from env.models import ResetResponse, StepResult, StateResponse
+from env.models import StepResult, StateResponse, ResetResponse
 
 app = FastAPI(
     title="Email Triage OpenEnv",
     description=(
         "An OpenEnv-compliant environment for evaluating AI agents on "
-        "real-world email triage tasks: urgency classification, action item extraction, "
-        "and full multi-stakeholder email triage."
+        "real-world email triage tasks across 4 difficulty levels."
     ),
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -35,19 +40,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Single global environment instance (stateful per session)
-_env = EmailTriageEnv()
+# ---------------------------------------------------------------------------
+# Session store  — { session_id: EmailTriageEnv }
+# ---------------------------------------------------------------------------
+_sessions: Dict[str, EmailTriageEnv] = {}
+
+
+def _get_session(session_id: str) -> EmailTriageEnv:
+    env = _sessions.get(session_id)
+    if env is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Session '{session_id}' not found. Call POST /reset first.",
+        )
+    return env
 
 
 # ---------------------------------------------------------------------------
-# Request / Response schemas
+# Request schemas
 # ---------------------------------------------------------------------------
 
 class ResetRequest(BaseModel):
     task_id: str = "task_1"
+    session_id: Optional[str] = None   # client may supply one; else auto-generated
 
 
 class StepRequest(BaseModel):
+    session_id: str
     action: Dict[str, Any]
 
 
@@ -57,7 +76,12 @@ class StepRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "email-triage-openenv"}
+    return {
+        "status": "ok",
+        "service": "email-triage-openenv",
+        "version": "2.0.0",
+        "active_sessions": len(_sessions),
+    }
 
 
 @app.get("/tasks")
@@ -80,31 +104,54 @@ def list_tasks():
 
 @app.post("/reset", response_model=ResetResponse)
 def reset(request: ResetRequest):
+    sid = request.session_id or str(uuid.uuid4())
+    env = EmailTriageEnv()
+    _sessions[sid] = env
+
     try:
-        result = _env.reset(task_id=request.task_id)
-        return result
+        obs = env.reset(task_id=request.task_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    from env.tasks import TASKS
+    task = TASKS[request.task_id]
+    return ResetResponse(
+        session_id=sid,
+        observation=obs,
+        info={"task_name": task["name"], "difficulty": task["difficulty"]},
+    )
 
 
 @app.post("/step", response_model=StepResult)
 def step(request: StepRequest):
+    env = _get_session(request.session_id)
     try:
-        result = _env.step(request.action)
-        return result
+        return env.step(request.action)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/state", response_model=StateResponse)
-def state():
+def state(session_id: str = Query(..., description="Session ID from /reset")):
+    env = _get_session(session_id)
     try:
-        return _env.state()
+        return env.state()
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/session/{session_id}")
+def delete_session(session_id: str):
+    """Clean up a finished session to free memory."""
+    if session_id in _sessions:
+        del _sessions[session_id]
+        return {"deleted": session_id}
+    raise HTTPException(status_code=404, detail="Session not found")
 
 
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=7861, reload=False)
+    import os
+    port = int(os.environ.get("PORT", "7860"))   # 7860 = HF Spaces default
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)

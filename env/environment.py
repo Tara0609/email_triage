@@ -1,15 +1,15 @@
 """
 Core Email Triage environment implementing the OpenEnv spec:
-  reset() -> ResetResponse
-  step(action) -> StepResult
-  state() -> StateResponse
+  reset(task_id) -> ResetResponse
+  step(action)   -> StepResult
+  state()        -> StateResponse
 """
 
-import json
 from typing import Any, Dict, List, Optional
 from .models import (
-    Email, EmailObservation, StepResult, StateResponse, ResetResponse,
+    EmailObservation, StepResult, StateResponse, ResetResponse,
     ClassifyUrgencyAction, ExtractActionsAction, FullTriageAction,
+    PrioritizeEmailsAction,
 )
 from .data import EMAILS_BY_ID
 from .tasks import TASKS, GRADERS
@@ -25,7 +25,7 @@ class EmailTriageEnv:
         self._current_observation: Optional[EmailObservation] = None
 
     # ------------------------------------------------------------------
-    def reset(self, task_id: str = "task_1") -> ResetResponse:
+    def reset(self, task_id: str = "task_1") -> EmailObservation:
         if task_id not in TASKS:
             raise ValueError(f"Unknown task_id '{task_id}'. Valid: {list(TASKS.keys())}")
 
@@ -37,7 +37,6 @@ class EmailTriageEnv:
         self._submitted_actions = []
 
         emails = [EMAILS_BY_ID[eid] for eid in task["email_ids"]]
-
         obs = EmailObservation(
             task_id=task_id,
             task_description=task["description"],
@@ -51,10 +50,7 @@ class EmailTriageEnv:
             max_steps=task["max_steps"],
         )
         self._current_observation = obs
-        return ResetResponse(
-            observation=obs,
-            info={"task_name": task["name"], "difficulty": task["difficulty"]},
-        )
+        return obs
 
     # ------------------------------------------------------------------
     def step(self, action: Dict[str, Any]) -> StepResult:
@@ -65,32 +61,30 @@ class EmailTriageEnv:
 
         task = TASKS[self._task_id]
         self._step_count += 1
-
-        # Parse action based on task type
         action_type = task["action_type"]
+
         parsed = self._parse_action(action_type, action)
         if parsed is None:
-            # Invalid action — small penalty
             reward = 0.0
-            info = {"error": "invalid_action", "raw": action}
+            info: Dict[str, Any] = {"error": "invalid_action", "details": str(action)[:200]}
         else:
             self._submitted_actions.append(parsed)
-            # Intermediate reward: progress signal
-            reward, info = self._compute_intermediate_reward(parsed)
+            reward, info = self._intermediate_reward()
 
-        # Check termination: agent has submitted an action for every email
-        email_ids_covered = self._get_covered_email_ids()
+        # Termination check
+        email_ids_covered = self._covered_email_ids()
         task_email_ids = set(task["email_ids"])
         all_covered = task_email_ids.issubset(email_ids_covered)
 
         if all_covered or self._step_count >= task["max_steps"]:
             self._done = True
-            # Final grading
             final_result = self._final_grade()
             reward = final_result["score"]
             self._cumulative_reward = reward
             info["final_score"] = final_result
-            info["done_reason"] = "all_emails_processed" if all_covered else "max_steps_reached"
+            info["done_reason"] = (
+                "all_emails_processed" if all_covered else "max_steps_reached"
+            )
 
         self._current_observation = EmailObservation(
             task_id=self._task_id,
@@ -126,39 +120,57 @@ class EmailTriageEnv:
         )
 
     # ------------------------------------------------------------------
-    # Internal helpers
+    # Helpers
     # ------------------------------------------------------------------
 
-    def _parse_action(self, action_type: str, action: Dict[str, Any]) -> Optional[Any]:
+    def _parse_action(self, action_type: str, raw: Dict[str, Any]) -> Optional[Any]:
         try:
             if action_type == "classify_urgency":
-                return ClassifyUrgencyAction(**action)
+                return ClassifyUrgencyAction(**raw)
             elif action_type == "extract_actions":
-                return ExtractActionsAction(**action)
+                return ExtractActionsAction(**raw)
             elif action_type == "full_triage":
-                return FullTriageAction(**action)
+                return FullTriageAction(**raw)
+            elif action_type == "prioritize_emails":
+                return PrioritizeEmailsAction(**raw)
         except Exception:
             return None
-        return None
 
-    def _get_covered_email_ids(self) -> set:
+    def _covered_email_ids(self) -> set:
+        """Return set of email IDs that have been processed by submitted actions."""
         covered = set()
         for a in self._submitted_actions:
             if hasattr(a, "email_id"):
                 covered.add(a.email_id)
+            elif hasattr(a, "ranked_email_ids"):
+                # task_4 single-action covers all emails in the ranking
+                covered.update(a.ranked_email_ids)
         return covered
 
-    def _compute_intermediate_reward(self, parsed_action: Any) -> tuple:
+    def _intermediate_reward(self) -> tuple:
         """
-        Returns a partial reward signal so the agent knows it's making progress,
-        without revealing the final score.
+        Compute a real partial grade on submitted actions so far,
+        dampened to max 0.1 so it doesn't spoil the final score.
         """
-        # Just acknowledge the action was received and valid
-        email_ids_covered = self._get_covered_email_ids()
+        try:
+            partial_result = self._final_grade()
+            partial_score = partial_result.get("score", 0.0)
+        except Exception:
+            partial_score = 0.0
+
+        email_ids_covered = self._covered_email_ids()
         task_email_ids = set(TASKS[self._task_id]["email_ids"])
-        progress = len(email_ids_covered) / len(task_email_ids)
-        reward = round(0.05 * progress, 4)  # tiny progress reward; final reward on done
-        return reward, {"progress": progress, "emails_processed": len(email_ids_covered)}
+        progress = len(email_ids_covered) / max(len(task_email_ids), 1)
+
+        # Intermediate reward: real partial score * progress, capped at 0.1
+        reward = round(min(0.1, partial_score * progress), 4)
+        info = {
+            "progress": round(progress, 3),
+            "emails_processed": len(email_ids_covered),
+            "emails_remaining": len(task_email_ids - email_ids_covered),
+            "partial_score": round(partial_score, 4),
+        }
+        return reward, info
 
     def _final_grade(self) -> Dict[str, Any]:
         grader = GRADERS[self._task_id]

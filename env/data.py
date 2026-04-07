@@ -3,7 +3,9 @@
 from .models import Email
 
 EMAILS = [
-    # ---- URGENT emails ----
+    # ================================================================
+    # URGENT
+    # ================================================================
     Email(
         id="e001",
         subject="CRITICAL: Production database down",
@@ -52,9 +54,40 @@ EMAILS = [
         ),
         timestamp="2024-01-15T08:45:00Z",
         thread_id="thread_003",
+        thread_context=(
+            "[Previous message — Jan 8]\n"
+            "From: Sarah Kim <s.kim@company.com>\n"
+            "Hi Marcus, just following up on the renewal — we'll have the docs ready "
+            "well before the deadline. No need to worry!"
+        ),
+    ),
+    Email(
+        id="e012",
+        subject="URGENT: GlobalCorp users locked out after your v2.3.1 update",
+        sender="Derek Walsh",
+        sender_email="d.walsh@globalcorp.com",
+        body=(
+            "Since your 2.3.1 release pushed last night, our entire 200-person team "
+            "cannot authenticate. SSO is returning a 403 on every login attempt. "
+            "This is blocking ALL operations at GlobalCorp. We have a board presentation "
+            "in 3 hours and nobody can access your platform. "
+            "Our contract ($800K/year) is up for renewal next month. "
+            "Engineering needs to rollback or hotfix IMMEDIATELY. "
+            "I'm escalating to your CEO if this isn't resolved in 30 minutes."
+        ),
+        timestamp="2024-01-15T07:30:00Z",
+        thread_id="thread_012",
+        thread_context=(
+            "[Previous message — Jan 14, 11 PM]\n"
+            "From: Deploy Bot <deploy@company.com>\n"
+            "v2.3.1 successfully deployed to production. Changes: SSO token refresh "
+            "logic updated, session timeout reduced to 8 hours."
+        ),
     ),
 
-    # ---- NORMAL emails ----
+    # ================================================================
+    # NORMAL
+    # ================================================================
     Email(
         id="e004",
         subject="Q1 engineering roadmap review - next Tuesday",
@@ -103,8 +136,43 @@ EMAILS = [
         timestamp="2024-01-15T07:00:00Z",
         thread_id="thread_006",
     ),
+    Email(
+        id="e013",
+        subject="Board meeting Thursday - slide deck needed by Wednesday noon",
+        sender="CEO Office",
+        sender_email="ceo.office@company.com",
+        body=(
+            "Reminder: our quarterly board meeting is this Thursday at 10am. "
+            "Each department head must submit their slide deck (max 5 slides) "
+            "to me by Wednesday at noon sharp for final compilation. "
+            "Topics required: Q4 actuals vs. targets, Q1 OKR status, headcount plan, "
+            "and top 3 risks with mitigations. Finance, please include the P&L summary. "
+            "No exceptions on the deadline — the board package goes to print at 2pm Wednesday."
+        ),
+        timestamp="2024-01-15T08:30:00Z",
+        thread_id="thread_013",
+    ),
+    Email(
+        id="e014",
+        subject="Q2 server capacity planning - need estimates by Jan 24",
+        sender="Infrastructure Team",
+        sender_email="infra@company.com",
+        body=(
+            "We're kicking off Q2 capacity planning. To avoid last quarter's "
+            "resource crunch, we need each engineering team to submit their "
+            "compute/storage estimates by January 24. "
+            "Please use the capacity planning template in Confluence. "
+            "Key fields: peak RPS forecast, storage growth %, new services launching. "
+            "Procurement lead time is 6 weeks, so late submissions will delay Q2 launches. "
+            "Questions? Ping @infra-team in Slack."
+        ),
+        timestamp="2024-01-15T10:00:00Z",
+        thread_id="thread_014",
+    ),
 
-    # ---- LOW priority emails ----
+    # ================================================================
+    # LOW
+    # ================================================================
     Email(
         id="e007",
         subject="Office holiday party photos",
@@ -148,8 +216,24 @@ EMAILS = [
         ),
         timestamp="2024-01-15T13:15:00Z",
     ),
+    Email(
+        id="e015",
+        subject="Team lunch poll - pick your restaurant!",
+        sender="People Ops",
+        sender_email="people@company.com",
+        body=(
+            "We're doing a team lunch next Friday to celebrate Q4 hitting our targets! "
+            "Please vote for your preferred restaurant by clicking the link below. "
+            "Options: 1) Trattoria Roma (Italian), 2) The Golden Chopstick (Chinese), "
+            "3) La Parrilla (Mexican). Poll closes Thursday. "
+            "Lunch is on the company — $40 per person budget."
+        ),
+        timestamp="2024-01-15T12:00:00Z",
+    ),
 
-    # ---- COMPLEX emails (for hard task) ----
+    # ================================================================
+    # COMPLEX / MULTI-DEPARTMENT (task_3)
+    # ================================================================
     Email(
         id="e010",
         subject="Multi-department issue: GDPR compliance audit findings",
@@ -193,7 +277,14 @@ EMAILS = [
 
 EMAILS_BY_ID = {e.id: e for e in EMAILS}
 
+# -----------------------------------------------------------------------
 # Task-specific email sets
-TASK_1_EMAILS = ["e001", "e004", "e007", "e002", "e008", "e009"]  # mix of urgencies
-TASK_2_EMAILS = ["e004", "e005", "e006"]                           # action-heavy emails
-TASK_3_EMAILS = ["e010", "e011", "e003"]                          # complex multi-department
+# -----------------------------------------------------------------------
+TASK_1_EMAILS = ["e001", "e004", "e007", "e002", "e008", "e009"]   # 2 each of urgent/normal/low
+TASK_2_EMAILS = ["e004", "e005", "e006"]                            # action-heavy
+TASK_3_EMAILS = ["e010", "e011", "e003"]                            # complex multi-dept
+TASK_4_EMAILS = [                                                    # all urgency levels mixed
+    "e001", "e002", "e003", "e012",   # urgent
+    "e004", "e013", "e014",           # normal
+    "e008", "e015", "e007",           # low / very low
+]
