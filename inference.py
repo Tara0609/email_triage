@@ -318,7 +318,7 @@ def run_per_email_task(task_id: str, obs: dict, session_id: str) -> Tuple[float,
     emails      = obs["emails"]
     system      = SYSTEM_PROMPTS[action_type]
     step_count  = 0
-    final_score = 0.0
+    final_score = 0.001  # default: in-range score if loop exits without done=True
 
     log_start(task_id, obs["task_description"])
 
@@ -354,7 +354,7 @@ def run_per_email_task(task_id: str, obs: dict, session_id: str) -> Tuple[float,
 def run_ranking_task(task_id: str, obs: dict, session_id: str) -> Tuple[float, int]:
     emails      = obs["emails"]
     system      = SYSTEM_PROMPTS["prioritize_emails"]
-    final_score = 0.0
+    final_score = 0.001  # default: in-range score if done never triggers
 
     log_start(task_id, obs["task_description"])
 
@@ -414,6 +414,7 @@ def run_task(task_id: str) -> float:
     else:
         final_score, step_count = run_per_email_task(task_id, obs, session_id)
 
+    final_score = max(0.001, min(0.999, final_score))  # ensure strictly in (0, 1)
     log_end(task_id, final_score, step_count)
     return final_score
 
