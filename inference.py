@@ -440,11 +440,9 @@ def run_task(task_id: str) -> float:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    # Validate required environment variables
-    missing = [v for v in ["API_BASE_URL", "MODEL_NAME", "HF_TOKEN"]
-               if not os.environ.get(v)]
-    if missing:
-        print(json.dumps({"error": "missing_env_vars", "vars": missing}),
+    # Validate required environment variables (only HF_TOKEN has no default)
+    if not os.environ.get("HF_TOKEN"):
+        print(json.dumps({"error": "missing_env_vars", "vars": ["HF_TOKEN"]}),
               file=sys.stderr, flush=True)
         sys.exit(1)
 
