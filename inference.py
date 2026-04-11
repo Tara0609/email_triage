@@ -41,11 +41,7 @@ TASKS = ["task_1", "task_2", "task_3", "task_4"]
 # ---------------------------------------------------------------------------
 
 def log_start(task_id: str, task_description: str) -> None:
-    print(json.dumps({
-        "event": "START",
-        "task_id": task_id,
-        "task_description": task_description,
-    }), flush=True)
+    print(f"[START] task={task_id}", flush=True)
 
 
 def log_step(
@@ -56,24 +52,11 @@ def log_step(
     done: bool,
     info: dict,
 ) -> None:
-    print(json.dumps({
-        "event": "STEP",
-        "task_id": task_id,
-        "step": step,
-        "action": action,
-        "reward": reward,
-        "done": done,
-        "info": info,
-    }), flush=True)
+    print(f"[STEP] step={step} reward={reward} done={done}", flush=True)
 
 
 def log_end(task_id: str, final_score: float, total_steps: int) -> None:
-    print(json.dumps({
-        "event": "END",
-        "task_id": task_id,
-        "final_score": final_score,
-        "total_steps": total_steps,
-    }), flush=True)
+    print(f"[END] task={task_id} score={final_score} steps={total_steps}", flush=True)
 
 
 # ---------------------------------------------------------------------------
