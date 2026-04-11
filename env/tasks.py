@@ -152,6 +152,11 @@ TASKS = {
 # Fuzzy match helper  (difflib, no extra dependency)
 # ---------------------------------------------------------------------------
 
+def _clamp(score: float) -> float:
+    """Clamp score to strictly open interval (0, 1) as required by validator."""
+    return round(max(0.001, min(0.999, score)), 4)
+
+
 def _fuzzy_match(a: str, b: str, threshold: float = 0.55) -> bool:
     """Return True if strings are similar enough (case-insensitive)."""
     a, b = a.lower().strip(), b.lower().strip()
@@ -193,7 +198,7 @@ def grade_task_1(actions: List[ClassifyUrgencyAction]) -> Dict[str, Any]:
             }
             correct += partial
 
-    final_score = round(correct / len(TASK_1_EMAILS), 4)
+    final_score = _clamp(correct / len(TASK_1_EMAILS))
     return {
         "score": final_score,
         "per_email": results,
@@ -256,7 +261,7 @@ def grade_task_2(actions: List[ExtractActionsAction]) -> Dict[str, Any]:
         results[email_id] = {"score": round(email_score, 4), "breakdown": breakdown}
         total_score += email_score
 
-    final_score = round(total_score / len(TASK_2_EMAILS), 4)
+    final_score = _clamp(total_score / len(TASK_2_EMAILS))
     return {"score": final_score, "per_email": results}
 
 
@@ -327,7 +332,7 @@ def grade_task_3(actions: List[FullTriageAction]) -> Dict[str, Any]:
         results[email_id] = {"score": round(email_score, 4), "breakdown": breakdown}
         total_score += email_score
 
-    final_score = round(total_score / len(TASK_3_EMAILS), 4)
+    final_score = _clamp(total_score / len(TASK_3_EMAILS))
     return {"score": final_score, "per_email": results}
 
 
@@ -365,7 +370,7 @@ def grade_task_4(actions: List[PrioritizeEmailsAction]) -> Dict[str, Any]:
     """
     action = actions[-1] if actions else None   # use last submitted (agent may retry)
     if action is None:
-        return {"score": 0.0, "reason": "no action submitted"}
+        return {"score": 0.001, "reason": "no action submitted"}
 
     predicted = action.ranked_email_ids
     true_order = PRIORITY_GT
@@ -373,7 +378,7 @@ def grade_task_4(actions: List[PrioritizeEmailsAction]) -> Dict[str, Any]:
     spearman = _spearman_score(predicted, true_order)
     top3     = _top_k_accuracy(predicted, true_order, k=3)
 
-    final_score = round(0.65 * spearman + 0.35 * top3, 4)
+    final_score = _clamp(0.65 * spearman + 0.35 * top3)
 
     # Per-position breakdown for transparency
     true_ranks = {eid: i for i, eid in enumerate(true_order)}
